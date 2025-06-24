@@ -1,54 +1,17 @@
-workspace "GLFW"
-    configurations { "Debug", "Release" }
-    platforms { "x86_64", "x86" }
-    location "build"
-
-    filter "configurations:Debug"
-        defines { "DEBUG" }
-        symbols "On"
-
-    filter "configurations:Release"
-        defines { "NDEBUG" }
-        optimize "On"
-
-    filter { "platforms:x86" }
-        architecture "x86"
-
-    filter { "platforms:x86_64" }
-        architecture "x86_64"
-
-project "glfw"
+project "GLFW"
     kind "StaticLib"
     language "C"
-    targetdir "lib/%{cfg.buildcfg}"
+    staticruntime "off"
+    warnings "off"
+    cdialect "C99"
+    
+    targetdir ("bin/%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}")
+    objdir ("bin-int/%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}/%{prj.name}")
 
-    -- GLFW version defines
-    defines {
-        "_GLFW_BUILD_DLL",
-        "GLFW_VERSION_MAJOR=3",
-        "GLFW_VERSION_MINOR=5",
-        "GLFW_VERSION_MICRO=0"
-    }
-
-    -- Platform detection
-    filter "system:windows"
-        defines { "_GLFW_WIN32", "UNICODE", "_UNICODE", "WINVER=0x0501" }
-        systemversion "latest"
-        links { "gdi32" }
-
-    filter "system:macosx"
-        defines { "_GLFW_COCOA" }
-        links { "Cocoa.framework", "IOKit.framework", "CoreFoundation.framework", "QuartzCore.framework" }
-
-    filter "system:linux"
-        defines { "_GLFW_X11" } -- Default to X11 on Linux
-        links { "X11", "Xrandr", "Xinerama", "Xcursor", "Xi", "Xext", "m", "pthread", "dl" }
-
-    -- Common source files
+    -- Common files
     files {
-        "src/internal.h",
-        "src/platform.h",
-        "src/mappings.h",
+        "include/GLFW/glfw3.h",
+        "include/GLFW/glfw3native.h",
         "src/context.c",
         "src/init.c",
         "src/input.c",
@@ -57,11 +20,20 @@ project "glfw"
         "src/vulkan.c",
         "src/window.c",
         "src/egl_context.c",
-        "src/osmesa_context.c"
+        "src/osmesa_context.c",
+        "src/null_platform.h",
+        "src/null_joystick.h",
+        "src/null_init.c",
+        "src/null_joystick.c",
+        "src/null_monitor.c",
+        "src/null_window.c",
     }
 
-    -- Platform-specific files
+    -- Platform-specific configuration
     filter "system:windows"
+        system "windows"
+        systemversion "latest"
+        
         files {
             "src/win32_platform.h",
             "src/win32_joystick.h",
@@ -76,8 +48,54 @@ project "glfw"
             "src/win32_time.c",
             "src/win32_thread.c"
         }
+        
+        defines {
+            "_GLFW_WIN32",
+            "UNICODE",
+            "_UNICODE",
+            "WINVER=0x0501",
+            "_CRT_SECURE_NO_WARNINGS"
+        }
+        
+        links { "gdi32" }
+
+    filter "system:linux"
+        system "linux"
+        pic "On"
+        
+        files {
+            "src/x11_platform.h",
+            "src/xkb_unicode.h",
+            "src/x11_init.c",
+            "src/x11_monitor.c",
+            "src/x11_window.c",
+            "src/xkb_unicode.c",
+            "src/glx_context.c",
+            "src/posix_time.h",
+            "src/posix_thread.h",
+            "src/posix_module.c",
+            "src/posix_time.c",
+            "src/posix_thread.c",
+            "src/posix_poll.h",
+            "src/posix_poll.c",
+            "src/linux_joystick.h",
+            "src/linux_joystick.c"
+        }
+        
+        defines {
+            "_GLFW_X11",
+            "_DEFAULT_SOURCE"
+        }
+        
+        links {
+            "X11", "Xrandr", "Xinerama", "Xcursor", "Xi", "Xext",
+            "m", "pthread", "dl", "rt"
+        }
 
     filter "system:macosx"
+        system "macosx"
+        pic "On"
+        
         files {
             "src/cocoa_platform.h",
             "src/cocoa_joystick.h",
@@ -92,25 +110,16 @@ project "glfw"
             "src/posix_module.c",
             "src/posix_thread.c"
         }
-
-    filter "system:linux"
-        files {
-            "src/x11_platform.h",
-            "src/xkb_unicode.h",
-            "src/x11_init.c",
-            "src/x11_monitor.c",
-            "src/x11_window.c",
-            "src/xkb_unicode.c",
-            "src/glx_context.c",
-            "src/linux_joystick.h",
-            "src/linux_joystick.c",
-            "src/posix_time.h",
-            "src/posix_thread.h",
-            "src/posix_module.c",
-            "src/posix_time.c",
-            "src/posix_thread.c",
-            "src/posix_poll.h",
-            "src/posix_poll.c"
+        
+        defines { "_GLFW_COCOA" }
+        
+        -- Corrected framework linking for all Premake versions
+        buildoptions { "-fobjc-arc" }
+        linkoptions { 
+            "-framework Cocoa", 
+            "-framework IOKit", 
+            "-framework CoreFoundation",
+            "-framework QuartzCore"
         }
 
     -- Include directories
@@ -119,15 +128,19 @@ project "glfw"
         "src"
     }
 
-    -- Warnings and compiler flags
-    filter "action:gmake or action:clang"
-        buildoptions { "-Wall" }
+    -- Configuration filters
+    filter "configurations:Debug"
+        runtime "Debug"
+        symbols "on"
+        optimize "off"
 
-    filter "action:vs*"
-        buildoptions { "/W3" }
-        defines { "_CRT_SECURE_NO_WARNINGS" }
+    filter "configurations:Release"
+        runtime "Release"
+        symbols "off"
+        optimize "speed"
 
-    -- Linux-specific settings
-    filter "system:linux"
-        buildoptions { "-fPIC" }
-        defines { "_DEFAULT_SOURCE" }
+    filter "configurations:Dist"
+        runtime "Release"
+        symbols "off"
+        optimize "speed"
+        inlining "auto"
