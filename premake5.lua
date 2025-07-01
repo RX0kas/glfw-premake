@@ -1,8 +1,13 @@
 project "GLFW"
 	kind "StaticLib"
 	language "C"
-	staticruntime "off"
+	staticruntime "on"
 	warnings "off"
+
+	defines {
+        "GLFW_STATIC",
+        "_GLFW_BUILD_DLL=0"
+    }
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
 	objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
@@ -96,6 +101,16 @@ project "GLFW"
 		{ 
 			"_GLFW_WIN32",
 			"_CRT_SECURE_NO_WARNINGS"
+		}
+
+		links {
+			"gdi32",
+			"user32",
+			"shell32",
+			"ole32",
+			"oleaut32",
+			"uuid",
+			"advapi32"
 		}
 
 	filter "configurations:Debug"
